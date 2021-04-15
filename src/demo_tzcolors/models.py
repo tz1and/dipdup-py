@@ -11,9 +11,6 @@ class AuctionStatus(IntEnum):
 class Address(Model):
     address = fields.CharField(59, pk=True)
 
-    class Meta:
-        table = 'addresses'
-
 
 class Token(Model):
     id = fields.IntField(pk=True)
@@ -22,9 +19,6 @@ class Token(Model):
     level = fields.IntField()
     timestamp = fields.DatetimeField()
     holder = fields.ForeignKeyField('models.Address', 'tokens')
-
-    class Meta:
-        table = 'tokens'
 
 
 class Auction(Model):
@@ -37,9 +31,6 @@ class Auction(Model):
     status = fields.IntEnumField(AuctionStatus)
     level = fields.IntField()
     timestamp = fields.DatetimeField()
-
-    class Meta:
-        table = 'auctions'
 
 
 class Bid(Model):

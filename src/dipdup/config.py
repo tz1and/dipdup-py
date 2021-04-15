@@ -20,21 +20,13 @@ from typing_extensions import Literal
 
 from dipdup.exceptions import ConfigurationError
 from dipdup.models import IndexType, State
+from dipdup.utils import camel_to_snake, snake_to_camel
 
 ROLLBACK_HANDLER = 'on_rollback'
 ENV_VARIABLE_REGEX = r'\${([\w]*):-(.*)}'
 
 sys.path.append(os.getcwd())
 _logger = logging.getLogger(__name__)
-
-
-def snake_to_camel(value: str) -> str:
-    return ''.join(map(lambda x: x[0].upper() + x[1:], value.split('_')))
-
-
-def camel_to_snake(name):
-    name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
 
 
 @dataclass
@@ -201,14 +193,17 @@ class OperationIndexConfig:
     :param first_block: First block to process
     :param last_block: Last block to process
     :param handlers: List of indexer handlers
+    :param first_block: Start indexing from this block
+    :param last_block: Finish indexing at this block, skip realtime subscriptions
     """
 
     kind: Literal["operation"]
     datasource: Union[str, TzktDatasourceConfig]
     contract: Union[str, ContractConfig]
     handlers: List[OperationHandlerConfig]
+    models: List[str]
     first_block: int = 0
-    last_block: int = 0
+    last_block: Optional[int] = None
 
     def __post_init_post_parse__(self):
         self._state: Optional[State] = None
@@ -349,7 +344,11 @@ class DipDupConfig:
                     raw_template = re.sub(value_regex, value, raw_template)
                 json_template = json.loads(raw_template)
                 self.indexes[index_name] = template.__class__(**json_template)
-                self.indexes[index_name].template_values = index_config.values
+                self.indexes[index_name].template_values = {
+                    **index_config.values,
+                    'template': index_config.template,
+                }
+
 
         callback_patterns: Dict[str, List[List[OperationHandlerPatternConfig]]] = defaultdict(list)
 
@@ -369,6 +368,34 @@ class DipDupConfig:
                                 pattern.destination = self.contracts[pattern.destination]
             else:
                 raise NotImplementedError(f'Index kind `{index_config.kind}` is not supported')
+
+        _logger.info('Defining database namespaces')
+        models = importlib.import_module(f'{self.package}.models')
+        for index_name, index_config in self.indexes.items():
+            if isinstance(index_config, OperationIndexConfig):
+                for model_name in index_config.models:
+                    model = getattr(models, model_name)
+                    if model._meta.db_table and not index_config.template_values:
+                        raise ConfigurationError(
+                            f'Model `{model.__name__}` is in use by another index or it\'s table name was configured manually. '
+                            f'Resolve conflict or remove `Meta` class from model definition.'
+                        )
+                    if index_config.template_values:
+                        new_table_name = '_'.join(
+                            [
+                                camel_to_snake(index_name),
+                                camel_to_snake(index_config.template_values['template'])
+                            ]
+                        )
+                    else:
+                        new_table_name = '_'.join(
+                            [
+                                camel_to_snake(index_name),
+                                camel_to_snake(model.__name__)
+                            ]
+                        )
+                    _logger.debug('%s -> %s', model.__name__, new_table_name)
+                    model._meta.db_table = new_table_name
 
         _logger.info('Verifying callback uniqueness')
         for callback, patterns in callback_patterns.items():

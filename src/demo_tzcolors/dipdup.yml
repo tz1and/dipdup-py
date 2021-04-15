@@ -37,6 +37,11 @@ templates:
         pattern:
           - destination: <auction>
             entrypoint: withdraw
+    models:
+      - Address
+      - Token
+      - Auction
+      - Bid
 
 indexes:
 
