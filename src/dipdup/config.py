@@ -32,6 +32,8 @@ from typing import Union
 from typing import cast
 from urllib.parse import urlparse
 
+from pydantic import BaseModel
+from pydantic import Extra
 from pydantic import validator
 from pydantic.dataclasses import dataclass
 from pydantic.json import pydantic_encoder
@@ -968,6 +970,11 @@ class AdvancedConfig:
     metadata_interface: bool = False
 
 
+class CustomConfig(BaseModel):
+    class Config:
+        extra = Extra.allow.value
+
+
 @dataclass
 class DipDupConfig:
     """Main dapp config
@@ -983,6 +990,7 @@ class DipDupConfig:
     :param jobs: Mapping of job aliases and job configs
     :param sentry: Sentry integration config
     :param advanced: Advanced config
+    :param custom: User-defined Custom config
     """
 
     spec_version: str
@@ -998,6 +1006,7 @@ class DipDupConfig:
     sentry: Optional[SentryConfig] = None
     prometheus: Optional[PrometheusConfig] = None
     advanced: AdvancedConfig = AdvancedConfig()
+    custom: Optional[CustomConfig] = None
 
     def __post_init_post_parse__(self):
         self.paths: List[str] = []
