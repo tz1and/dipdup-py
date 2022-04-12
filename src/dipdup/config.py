@@ -80,6 +80,10 @@ class SqliteDatabaseConfig:
     kind: Literal['sqlite']
     path: str = DEFAULT_SQLITE_PATH
 
+    @property
+    def schema_name(self) -> str:
+        return 'public'
+
     @cached_property
     def connection_string(self) -> str:
         return f'{self.kind}://{self.path}'
