@@ -164,6 +164,16 @@ class HasuraGateway(HTTPGateway):
 
         self._logger.info('Hasura instance has been configured')
 
+    async def update_metadata_hash(self) -> None:
+        hasura_schema_name = f'hasura_{self._hasura_config.url}'
+        hasura_schema, _ = await Schema.get_or_create(name=hasura_schema_name, defaults={'hash': ''})
+
+        # NOTE: Fetch metadata once again (to do: find out why is it necessary) and save its hash for future comparisons
+        metadata = await self._fetch_metadata()
+        metadata_hash = self._hash_metadata(metadata)
+        hasura_schema.hash = metadata_hash  # type: ignore
+        await hasura_schema.save()
+
     async def _hasura_request(self, endpoint: str, json: Dict[str, Any]) -> Dict[str, Any]:
         self._logger.debug('Sending `%s` request: %s', endpoint, dump_json(json))
         try:
