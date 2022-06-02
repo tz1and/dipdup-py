@@ -201,7 +201,6 @@ class Index:
         )
 
     async def process(self) -> None:
-        # NOTE: `--oneshot` flag implied
         if not isinstance(self._config, HeadIndexConfig) and self._config.last_level:
             head_level = self._config.last_level
             with ExitStack() as stack:
@@ -605,8 +604,10 @@ class OperationIndex(Index):
 
     async def _get_origination_addresses(self) -> Set[str]:
         """Get addresses to fetch origination from during initial synchronization"""
-        # FIXME: Missing `OperationType.origination` in config is ignored
-        addresses = set()
+        if OperationType.origination not in self._config.types:
+            return set()
+
+        addresses: Set[str] = set()
         for handler_config in self._config.handlers:
             for pattern_config in handler_config.pattern:
                 if not isinstance(pattern_config, OperationHandlerOriginationPatternConfig):

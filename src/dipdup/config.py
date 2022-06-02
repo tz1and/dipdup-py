@@ -1254,18 +1254,17 @@ class DipDupConfig:
             return True
         elif old_hook:
             return False
+        else:
+            raise RuntimeError
 
     @property
     def oneshot(self) -> bool:
         """Whether all indexes have `last_level` field set"""
         syncable_indexes = tuple(c for c in self.indexes.values() if not isinstance(c, HeadIndexConfig))
         oneshot_indexes = tuple(c for c in syncable_indexes if c.last_level)
-        if not oneshot_indexes:
-            return False
-        elif len(oneshot_indexes) == len(syncable_indexes):
+        if len(oneshot_indexes) == len(syncable_indexes):
             return True
-        else:
-            raise ConfigurationError('Either all or none of indexes can have `last_level` field set')
+        return False
 
     @classmethod
     def load(
@@ -1482,29 +1481,25 @@ class DipDupConfig:
             return
 
         if isinstance(index_config, OperationIndexConfig):
-            if self.advanced.merge_subscriptions:
-                index_config.subscriptions.add(TransactionSubscription())
-                return
+            if OperationType.transaction in index_config.types:
+                if self.advanced.merge_subscriptions:
+                    index_config.subscriptions.add(TransactionSubscription())
+                else:
+                    for contract_config in index_config.contracts:
+                        if not isinstance(contract_config, ContractConfig):
+                            raise ConfigInitializationException
+                        index_config.subscriptions.add(TransactionSubscription(address=contract_config.address))
 
-            for contract_config in index_config.contracts:
-                if not isinstance(contract_config, ContractConfig):
-                    raise ConfigInitializationException
-                index_config.subscriptions.add(TransactionSubscription(address=contract_config.address))
-
-            for handler_config in index_config.handlers:
-                for pattern_config in handler_config.pattern:
-                    if isinstance(pattern_config, OperationHandlerOriginationPatternConfig):
-                        index_config.subscriptions.add(OriginationSubscription())
-                        break
+            if OperationType.origination in index_config.types:
+                index_config.subscriptions.add(OriginationSubscription())
 
         elif isinstance(index_config, BigMapIndexConfig):
             if self.advanced.merge_subscriptions:
                 index_config.subscriptions.add(BigMapSubscription())
-                return
-
-            for big_map_handler_config in index_config.handlers:
-                address, path = big_map_handler_config.contract_config.address, big_map_handler_config.path
-                index_config.subscriptions.add(BigMapSubscription(address=address, path=path))
+            else:
+                for big_map_handler_config in index_config.handlers:
+                    address, path = big_map_handler_config.contract_config.address, big_map_handler_config.path
+                    index_config.subscriptions.add(BigMapSubscription(address=address, path=path))
 
         elif isinstance(index_config, HeadIndexConfig):
             index_config.subscriptions.add(HeadSubscription())
