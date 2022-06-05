@@ -18,10 +18,6 @@
 
 ## 5.1.4 - 2022-06-02
 
-### Added
-
-* config: Added `hasura.create_source` flag to create PostgreSQL source if missing.
-
 ### Fixed
 
 * config: Fixed `OperationIndexConfig.types` field being partially ignored.
